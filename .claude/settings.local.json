@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//private/tmp/**)",
+      "Bash(curl -L -o cc-switch.zip \"https://ghproxy.com/https://github.com/farion1231/cc-switch/releases/download/v3.12.3/CC-Switch-v3.12.3-macOS.zip\")",
+      "Bash(unzip -o cc-switch.zip)",
+      "Bash(curl -L -o cc-switch.zip \"https://mirror.ghproxy.com/https://github.com/farion1231/cc-switch/releases/download/v3.12.3/CC-Switch-v3.12.3-macOS.zip\")",
+      "Bash(brew install:*)",
+      "Bash(export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890)",
+      "Bash(curl -sS https://starship.rs/install.sh)",
+      "Bash(sh)",
+      "Bash(sh -s -- --yes)",
+      "Bash(curl -L -o starship.tar.gz \"https://github.com/starship/starship/releases/latest/download/starship-x86_64-apple-darwin.tar.gz\")",
+      "Bash(tar xzf:*)",
+      "Bash(python main.py)",
+      "Bash(source venv/bin/activate)",
+      "Bash(npm run:*)",
+      "Bash(cd:*)",
+      "Bash(python3:*)",
+      "Bash(curl:*)",
+      "Bash(source:*)",
+      "Bash(kill:*)"
+    ]
+  }
+}
