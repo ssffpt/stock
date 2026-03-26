@@ -103,6 +103,53 @@ class ClearedPositionDetailResponse(BaseModel):
     records: List[ClearedPositionDetailRecord]
 
 
+# ============== 清洗相关 Schema ==============
+
+class CleanRequest(BaseModel):
+    """清洗请求模型"""
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    stock_codes: Optional[List[str]] = None
+
+
+class CleanResponse(BaseModel):
+    """清洗响应模型"""
+    success: bool
+    cleaned_count: int
+    message: str
+
+
+class ClearedPositionResponse(BaseModel):
+    """已清仓周期响应模型（预计算表）"""
+    id: int
+    stock_code: str
+    stock_name: str
+    cycle_index: int
+    open_date: date
+    close_date: date
+    hold_days: int
+    total_buy_amount: Decimal
+    total_sell_amount: Decimal
+    total_buy_qty: int
+    profit_loss: Decimal
+    profit_rate: Decimal
+    avg_buy_price: Decimal
+    avg_sell_price: Decimal
+    record_ids: Optional[str] = None
+    updated_at: datetime
+    cost_vs_open: Optional[Decimal] = None
+    cost_vs_close: Optional[Decimal] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClearedPositionStatus(BaseModel):
+    """已清仓周期状态模型"""
+    last_clean_time: Optional[datetime] = None
+    total_cycles: int
+    stocks: List[str]
+
+
 # ============== 股票日行情 Schema ==============
 
 class StockDailyQuoteBase(BaseModel):

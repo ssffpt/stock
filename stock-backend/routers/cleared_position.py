@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 import crud
+from schemas import CleanRequest, CleanResponse, ClearedPositionStatus
 
 router = APIRouter(prefix="/cleared-positions", tags=["已清仓股票统计"])
 
@@ -36,7 +37,7 @@ def get_cleared_positions(
     if order_dir not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="order_dir 必须是 asc 或 desc")
 
-    items, total = crud.get_cleared_positions(
+    items, total, last_clean_time = crud.get_cleared_positions_from_table(
         db=db,
         page=page,
         page_size=page_size,
@@ -55,6 +56,7 @@ def get_cleared_positions(
             "page": page,
             "page_size": page_size,
             "list": items,
+            "last_clean_time": last_clean_time,
         }
     }
 
@@ -86,3 +88,32 @@ def get_cleared_position_detail(
             "records": records,
         }
     }
+
+
+@router.post("/clean", response_model=CleanResponse)
+def clean_cleared_positions(
+    request: CleanRequest,
+    db: Session = Depends(get_db),
+):
+    """清洗已清仓周期数据到预计算表"""
+    cleaned_count, message = crud.clean_cleared_positions(
+        db=db,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        stock_codes=request.stock_codes,
+    )
+
+    return CleanResponse(
+        success=cleaned_count > 0 or "成功" in message,
+        cleaned_count=cleaned_count,
+        message=message,
+    )
+
+
+@router.get("/status", response_model=ClearedPositionStatus)
+def get_cleared_position_status(
+    db: Session = Depends(get_db),
+):
+    """获取已清仓周期预计算表状态"""
+    status = crud.get_cleared_position_status(db=db)
+    return ClearedPositionStatus(**status)

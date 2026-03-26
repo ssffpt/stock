@@ -8,6 +8,7 @@ import {
   ClearedPositionParams,
   ClearedPositionRecord,
 } from "@/lib/api";
+import CleanControl from "@/components/CleanControl";
 
 export default function ClearedPositionsPage() {
   const getMonthStart = () => {
@@ -99,6 +100,10 @@ export default function ClearedPositionsPage() {
     setPage(1);
   };
 
+  const handleCleanComplete = () => {
+    fetchData();
+  };
+
   const viewDetail = async (position: ClearedPosition) => {
     setSelectedPosition(position);
     setShowDetail(true);
@@ -157,6 +162,9 @@ export default function ClearedPositionsPage() {
         <h1 className="text-2xl font-bold text-slate-800">已清仓股票统计</h1>
         <p className="text-sm text-slate-500 mt-1">查看股票持仓周期内的买卖明细及盈亏统计</p>
       </div>
+
+      {/* 清洗控制 */}
+      <CleanControl onCleanComplete={handleCleanComplete} />
 
       {/* 筛选条件 */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6">

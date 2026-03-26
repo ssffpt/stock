@@ -44,3 +44,29 @@ class StockDailyQuote(Base):
     low_price = Column(DECIMAL(10, 3), nullable=True, comment="最低价")
     volume = Column(BigInteger, nullable=True, comment="成交量")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+
+class ClearedPosition(Base):
+    """已清仓周期预计算表"""
+    __tablename__ = "cleared_position"
+    __table_args__ = (
+        Index('uk_cleared_position_stock_cycle', 'stock_code', 'cycle_index', unique=True),
+        {"comment": "已清仓周期预计算表"}
+    )
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    stock_code = Column(String(20), nullable=False, index=True, comment="股票代码")
+    stock_name = Column(String(50), nullable=False, comment="股票名称")
+    cycle_index = Column(Integer, nullable=False, comment="第几轮周期")
+    open_date = Column(Date, nullable=False, comment="开仓日期")
+    close_date = Column(Date, nullable=False, comment="清仓日期")
+    hold_days = Column(Integer, nullable=False, comment="持有天数")
+    total_buy_amount = Column(DECIMAL(15, 2), nullable=False, comment="买入总金额")
+    total_sell_amount = Column(DECIMAL(15, 2), nullable=False, comment="卖出总金额")
+    total_buy_qty = Column(Integer, nullable=False, comment="买入总数量")
+    profit_loss = Column(DECIMAL(15, 2), nullable=False, comment="盈亏金额")
+    profit_rate = Column(DECIMAL(10, 2), nullable=False, comment="收益率")
+    avg_buy_price = Column(DECIMAL(10, 3), nullable=False, comment="买入均价")
+    avg_sell_price = Column(DECIMAL(10, 3), nullable=False, comment="卖出均价")
+    record_ids = Column(Text, nullable=True, comment="对应的原始交割单ID列表JSON数组")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="最后清洗时间")

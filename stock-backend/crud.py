@@ -1,11 +1,12 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List, Tuple, Dict, Any
+import json
 
 from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session
 
-from models import OriginalDelivery, StockDailyQuote
+from models import OriginalDelivery, StockDailyQuote, ClearedPosition
 from schemas import OriginalDeliveryCreate
 
 
@@ -234,6 +235,13 @@ def calculate_cycle_stats(cycle: list[Dict[str, Any]], cycle_index: int) -> Dict
     else:
         avg_buy_price = Decimal("0")
 
+    # 卖出均价
+    total_sell_qty = sum(r['quantity'] for r in sell_records)
+    if total_sell_qty > 0:
+        avg_sell_price = (total_sell_amount / total_sell_qty).quantize(Decimal("0.001"))
+    else:
+        avg_sell_price = Decimal("0")
+
     return {
         'stock_code': stock_code,
         'stock_name': stock_name,
@@ -247,6 +255,7 @@ def calculate_cycle_stats(cycle: list[Dict[str, Any]], cycle_index: int) -> Dict
         'profit_loss': profit_loss.quantize(Decimal("0.01")),
         'profit_rate': profit_rate,
         'avg_buy_price': avg_buy_price,
+        'avg_sell_price': avg_sell_price,
         'cost_vs_open': None,
         'cost_vs_close': None,
     }
@@ -527,3 +536,304 @@ def get_cleared_position_by_dates(
     } for r in target_cycle]
 
     return stats, records_response
+
+
+# ============== 已清仓周期预计算表 CRUD ==============
+
+def _get_stock_cycles_from_deliveries(
+    db: Session,
+    stock_code: str,
+    cycle_index_start: int = 1
+) -> list[Dict[str, Any]]:
+    """
+    从原始交割单计算某只股票的周期列表（内部使用）
+    返回: 包含record_ids的周期统计列表
+    """
+    # 查询该股票的所有交割记录
+    records = db.query(OriginalDelivery).filter(
+        OriginalDelivery.stock_code == stock_code
+    ).order_by(
+        OriginalDelivery.trade_date,
+        func.ifnull(OriginalDelivery.trade_time, '23:59:59')
+    ).all()
+
+    if not records:
+        return []
+
+    # 转换为字典
+    records_dict = [{
+        'id': r.id,
+        'trade_date': r.trade_date,
+        'trade_time': r.trade_time,
+        'stock_code': r.stock_code,
+        'stock_name': r.stock_name,
+        'trade_type': r.trade_type,
+        'quantity': r.quantity,
+        'trade_price': r.trade_price,
+        'deal_amount': r.deal_amount,
+        'occur_amount': r.occur_amount,
+        'fee': r.fee,
+        'remark': r.remark,
+    } for r in records]
+
+    # 切割周期
+    cycles = split_into_cycles(records_dict)
+
+    # 计算每个周期的统计指标
+    result = []
+    for idx, cycle in enumerate(cycles, start=cycle_index_start):
+        stats = calculate_cycle_stats(cycle, idx)
+        # 添加record_ids
+        stats['record_ids'] = json.dumps([r['id'] for r in cycle])
+        result.append(stats)
+
+    return result
+
+
+def _upsert_cleared_positions(
+    db: Session,
+    cycles: List[Dict[str, Any]]
+) -> int:
+    """
+    批量upsert已清仓周期数据到预计算表
+    返回: 插入/更新的记录数
+    """
+    if not cycles:
+        return 0
+
+    from datetime import datetime
+    now = datetime.now()
+    count = 0
+
+    for cycle in cycles:
+        # 查询是否已存在
+        existing = db.query(ClearedPosition).filter(
+            ClearedPosition.stock_code == cycle['stock_code'],
+            ClearedPosition.cycle_index == cycle['cycle_index']
+        ).first()
+
+        if existing:
+            # 更新已存在的记录
+            existing.stock_name = cycle['stock_name']
+            existing.open_date = cycle['open_date']
+            existing.close_date = cycle['close_date']
+            existing.hold_days = cycle['hold_days']
+            existing.total_buy_amount = cycle['total_buy_amount']
+            existing.total_sell_amount = cycle['total_sell_amount']
+            existing.total_buy_qty = cycle['total_buy_qty']
+            existing.profit_loss = cycle['profit_loss']
+            existing.profit_rate = cycle['profit_rate']
+            existing.avg_buy_price = cycle['avg_buy_price']
+            existing.avg_sell_price = cycle.get('avg_sell_price', Decimal("0"))
+            existing.record_ids = cycle['record_ids']
+            existing.updated_at = now
+        else:
+            # 插入新记录
+            new_position = ClearedPosition(
+                stock_code=cycle['stock_code'],
+                stock_name=cycle['stock_name'],
+                cycle_index=cycle['cycle_index'],
+                open_date=cycle['open_date'],
+                close_date=cycle['close_date'],
+                hold_days=cycle['hold_days'],
+                total_buy_amount=cycle['total_buy_amount'],
+                total_sell_amount=cycle['total_sell_amount'],
+                total_buy_qty=cycle['total_buy_qty'],
+                profit_loss=cycle['profit_loss'],
+                profit_rate=cycle['profit_rate'],
+                avg_buy_price=cycle['avg_buy_price'],
+                avg_sell_price=cycle.get('avg_sell_price', Decimal("0")),
+                record_ids=cycle['record_ids'],
+                updated_at=now,
+            )
+            db.add(new_position)
+
+        count += 1
+
+    db.commit()
+    return count
+
+
+def clean_cleared_positions(
+    db: Session,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    stock_codes: Optional[List[str]] = None,
+) -> Tuple[int, str]:
+    """
+    清洗已清仓周期数据到预计算表
+
+    参数:
+    - start_date, end_date: 时间段筛选（可选）
+    - stock_codes: 指定股票代码列表（可选）
+
+    返回: (清洗的周期数量, 消息)
+    """
+    try:
+        import json
+
+        # 确定需要处理的股票列表
+        if stock_codes:
+            # 指定了股票代码，只处理这些股票
+            target_stocks = stock_codes
+        else:
+            # 获取所有有交易的股票
+            if start_date and end_date:
+                # 时间段筛选：只处理该时间段内有变化的股票
+                target_stocks = db.query(OriginalDelivery.stock_code).filter(
+                    OriginalDelivery.trade_date >= start_date,
+                    OriginalDelivery.trade_date <= end_date
+                ).distinct().all()
+                target_stocks = [s[0] for s in target_stocks]
+            elif start_date:
+                target_stocks = db.query(OriginalDelivery.stock_code).filter(
+                    OriginalDelivery.trade_date >= start_date
+                ).distinct().all()
+                target_stocks = [s[0] for s in target_stocks]
+            elif end_date:
+                target_stocks = db.query(OriginalDelivery.stock_code).filter(
+                    OriginalDelivery.trade_date <= end_date
+                ).distinct().all()
+                target_stocks = [s[0] for s in target_stocks]
+            else:
+                # 无参数：处理所有股票
+                target_stocks = db.query(OriginalDelivery.stock_code).distinct().all()
+                target_stocks = [s[0] for s in target_stocks]
+
+        if not target_stocks:
+            return 0, "没有需要处理的数据"
+
+        total_cleaned = 0
+
+        for stock_code in target_stocks:
+            # 先删除该股票的旧记录（实现覆盖策略）
+            db.query(ClearedPosition).filter(
+                ClearedPosition.stock_code == stock_code
+            ).delete()
+
+            # 计算该股票的周期（从1开始）
+            cycles = _get_stock_cycles_from_deliveries(db, stock_code, 1)
+
+            if cycles:
+                # upsert到预计算表
+                cleaned = _upsert_cleared_positions(db, cycles)
+                total_cleaned += cleaned
+
+        return total_cleaned, f"成功清洗 {total_cleaned} 个周期"
+
+    except Exception as e:
+        db.rollback()
+        return 0, f"清洗失败: {str(e)}"
+
+
+def get_cleared_positions_from_table(
+    db: Session,
+    page: int = 1,
+    page_size: int = 20,
+    stock_code: Optional[str] = None,
+    profit_filter: str = "all",
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    order_by: str = "close_date",
+    order_dir: str = "desc",
+) -> Tuple[List[Dict[str, Any]], int, Optional[datetime]]:
+    """
+    从预计算表分页查询已清仓周期
+
+    返回: (周期列表, 总数, 最后清洗时间)
+    """
+    query = db.query(ClearedPosition)
+
+    # 筛选条件
+    filters = []
+    if stock_code:
+        filters.append(ClearedPosition.stock_code.contains(stock_code))
+    if profit_filter == "profit":
+        filters.append(ClearedPosition.profit_loss > 0)
+    elif profit_filter == "loss":
+        filters.append(ClearedPosition.profit_loss < 0)
+    if start_date:
+        filters.append(ClearedPosition.open_date >= start_date)
+    if end_date:
+        filters.append(ClearedPosition.open_date <= end_date)
+
+    if filters:
+        query = query.filter(and_(*filters))
+
+    # 获取最后清洗时间
+    last_clean_record = db.query(ClearedPosition).order_by(
+        ClearedPosition.updated_at.desc()
+    ).first()
+    last_clean_time = last_clean_record.updated_at if last_clean_record else None
+
+    # 排序
+    order_field_map = {
+        "close_date": ClearedPosition.close_date,
+        "profit_loss": ClearedPosition.profit_loss,
+        "profit_rate": ClearedPosition.profit_rate,
+        "hold_days": ClearedPosition.hold_days,
+        "open_date": ClearedPosition.open_date,
+    }
+    order_field = order_field_map.get(order_by, ClearedPosition.close_date)
+    if order_dir == "desc":
+        query = query.order_by(order_field.desc())
+    else:
+        query = query.order_by(order_field.asc())
+
+    # 总数
+    total = query.count()
+
+    # 分页
+    items = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    # 转换为字典
+    result = []
+    for item in items:
+        record = {
+            'id': item.id,
+            'stock_code': item.stock_code,
+            'stock_name': item.stock_name,
+            'cycle_index': item.cycle_index,
+            'open_date': item.open_date,
+            'close_date': item.close_date,
+            'hold_days': item.hold_days,
+            'total_buy_amount': item.total_buy_amount,
+            'total_sell_amount': item.total_sell_amount,
+            'total_buy_qty': item.total_buy_qty,
+            'profit_loss': item.profit_loss,
+            'profit_rate': item.profit_rate,
+            'avg_buy_price': item.avg_buy_price,
+            'avg_sell_price': item.avg_sell_price,
+            'record_ids': item.record_ids,
+            'updated_at': item.updated_at,
+        }
+        result.append(record)
+
+    # 关联行情数据补充成本百分比
+    result = enrich_with_quote_data(db, result)
+
+    return result, total, last_clean_time
+
+
+def get_cleared_position_status(db: Session) -> Dict[str, Any]:
+    """
+    获取已清仓周期预计算表的状态
+    """
+    # 获取最后清洗时间
+    last_clean_record = db.query(ClearedPosition).order_by(
+        ClearedPosition.updated_at.desc()
+    ).first()
+    last_clean_time = last_clean_record.updated_at if last_clean_record else None
+
+    # 获取总周期数
+    total_cycles = db.query(ClearedPosition).count()
+
+    # 获取涉及的股票列表
+    stocks = db.query(ClearedPosition.stock_code).distinct().all()
+    stocks = [s[0] for s in stocks]
+
+    return {
+        'last_clean_time': last_clean_time,
+        'total_cycles': total_cycles,
+        'stocks': stocks,
+    }

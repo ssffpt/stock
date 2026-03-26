@@ -209,6 +209,37 @@ export async function syncQuotes(force: boolean = false): Promise<ApiResponse<{ 
   return fetchApi(url, { method: 'POST' });
 }
 
+// ============== 清洗操作 API ==============
+
+interface CleanResult {
+  success: boolean;
+  cleaned_count: number;
+  message: string;
+}
+
+interface CleanStatus {
+  last_clean_time: string;
+  total_cycles: number;
+  stocks: string[];
+}
+
+export async function cleanClearedPositions(params: {
+  start_date?: string;
+  end_date?: string;
+  stock_codes?: string[];
+}): Promise<CleanResult> {
+  const url = `${API_BASE_URL}/cleared-positions/clean`;
+  return fetchApi<CleanResult>(url, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function getClearedPositionStatus(): Promise<ApiResponse<CleanStatus>> {
+  const url = `${API_BASE_URL}/cleared-positions/status`;
+  return fetchApi<ApiResponse<CleanStatus>>(url);
+}
+
 export type {
   ClearedPosition,
   ClearedPositionRecord,
@@ -220,4 +251,6 @@ export type {
   OriginalDeliveryListResponse,
   OriginalDeliveryParams,
   ApiResponse,
+  CleanResult,
+  CleanStatus,
 };
