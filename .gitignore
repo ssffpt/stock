@@ -53,3 +53,5 @@ Thumbs.db
 htmlcov/
 
 .codebuddy/
+.claude/
+claude-code-hub/
