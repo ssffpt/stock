@@ -216,8 +216,10 @@ def calculate_cycle_stats(cycle: list[Dict[str, Any]], cycle_index: int) -> Dict
     hold_days = (close_date - open_date).days if open_date and close_date else 0
 
     # 金额信息
-    total_buy_amount = Decimal(str(sum(r['deal_amount'] for r in buy_records)))
-    total_sell_amount = Decimal(str(sum(r['deal_amount'] for r in sell_records)))
+    buy_deal_amounts = [Decimal(str(r['deal_amount'])) for r in buy_records]
+    sell_deal_amounts = [Decimal(str(r['deal_amount'])) for r in sell_records]
+    total_buy_amount = sum(buy_deal_amounts) if buy_deal_amounts else Decimal("0")
+    total_sell_amount = sum(sell_deal_amounts) if sell_deal_amounts else Decimal("0")
     total_buy_qty = sum(r['quantity'] for r in buy_records)
 
     # 盈亏计算
@@ -320,7 +322,7 @@ def enrich_with_quote_data(db: Session, cycles: List[Dict[str, Any]]) -> List[Di
         ).first()
 
         if quote and quote.open_price and quote.close_price:
-            avg_buy_price = cycle['avg_buy_price']
+            avg_buy_price = Decimal(str(cycle['avg_buy_price']))
             open_price = Decimal(str(quote.open_price))
             close_price = Decimal(str(quote.close_price))
 
