@@ -1,6 +1,16 @@
 # 项目状态跟踪
 
-## 当前阶段：修复完成
+## 当前阶段：功能迭代完成
+
+## 本次迭代完成内容（2026-03-27）
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 清洗UI优化 | ✅ 完成 | 清洗按钮改为小按钮+弹窗形式 |
+| cycle_index评估 | ✅ 完成 | 评估结论：保留原设计 |
+| Markdown笔记功能 | ✅ 完成 | 新增笔记功能，支持Markdown编辑 |
+
+## 里程碑
 
 ## 里程碑
 
@@ -35,6 +45,10 @@
 - `GET /cleared-positions` - 已修改为从预计算表查询并返回last_clean_time
 
 ## 最新动态
+- 2026-03-27: 功能迭代完成
+  1. 清洗UI优化：小按钮+弹窗交互
+  2. cycle_index评估结论：保留原设计不变
+  3. 新增Markdown笔记功能
 - 2026-03-27: 技术验收完成，发现以下严重问题需修复：
   1. cycle_index 递增逻辑错误（crud.py:707）- 会导致重复清洗时周期号不断增加
   2. avg_sell_price 缺失计算 - 导致卖出均价始终为0
@@ -46,3 +60,8 @@
 - [x] 添加 avg_sell_price 计算（crud.py calculate_cycle_stats）
 - [x] 统一字段定义与PRD一致（models.py）
 - [x] 修复前端默认日期为"本月"（CleanControl.tsx）
+
+## 笔记功能
+- 前端组件：支持Markdown编辑和预览
+- 存储位置：cleared_position表的notes字段
+- API：POST /cleared-positions/notes

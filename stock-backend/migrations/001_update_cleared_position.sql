@@ -10,5 +10,9 @@ ALTER TABLE cleared_position
     MODIFY total_buy_qty INT NOT NULL COMMENT '买入总数量',
     MODIFY profit_rate DECIMAL(10, 2) NOT NULL COMMENT '收益率';
 
--- 3. 验证修改后的结构
+-- 3. 添加 notes 字段（如果不存在）
+ALTER TABLE cleared_position
+    ADD COLUMN notes TEXT COMMENT '交易笔记，Markdown格式' AFTER record_ids;
+
+-- 4. 验证修改后的结构
 DESC cleared_position;

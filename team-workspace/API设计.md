@@ -250,7 +250,45 @@
 
 ---
 
-## 6. 数据库表结构
+## 6. 周期笔记 API
+
+### POST /cleared-positions/notes
+
+为指定清仓周期保存笔记。
+
+#### Request
+
+```json
+{
+  "stock_code": "600519",
+  "open_date": "2026-01-05",
+  "close_date": "2026-02-20",
+  "notes": "## 复盘总结\n\n本次操作盈利5%，主要原因是..."
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| stock_code | string | 是 | 股票代码 |
+| open_date | string (date) | 是 | 建仓日期 |
+| close_date | string (date) | 是 | 清仓日期 |
+| notes | string | 是 | Markdown格式的笔记内容 |
+
+#### Response
+
+```json
+{
+  "code": 200,
+  "data": {
+    "success": true,
+    "message": "笔记已保存"
+  }
+}
+```
+
+---
+
+## 7. 数据库表结构
 
 ### cleared_position 表
 
@@ -271,6 +309,7 @@ CREATE TABLE cleared_position (
     avg_buy_price DECIMAL(10,3) NOT NULL DEFAULT 0 COMMENT '买入均价',
     avg_sell_price DECIMAL(10,3) NOT NULL DEFAULT 0 COMMENT '卖出均价',
     record_ids TEXT COMMENT '原始交割单ID列表，JSON格式',
+    notes TEXT COMMENT 'Markdown格式的周期笔记',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_stock_cycle (stock_code, cycle_index),
     INDEX idx_close_date (close_date),

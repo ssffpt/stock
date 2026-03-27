@@ -23,6 +23,7 @@ export default function CleanControl({ onCleanComplete }: CleanControlProps) {
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
   };
 
+  const [showModal, setShowModal] = useState(false);
   const [startDate, setStartDate] = useState<string>(getMonthStart);
   const [endDate, setEndDate] = useState<string>(getToday);
   const [stockCodes, setStockCodes] = useState<string>("");
@@ -73,6 +74,7 @@ export default function CleanControl({ onCleanComplete }: CleanControlProps) {
       if (response.success) {
         fetchStatus();
         onCleanComplete?.();
+        setShowModal(false);
       }
     } catch (error) {
       console.error("清洗失败:", error);
@@ -96,7 +98,6 @@ export default function CleanControl({ onCleanComplete }: CleanControlProps) {
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-        second: "2-digit",
       });
     } catch {
       return dateStr;
@@ -104,119 +105,128 @@ export default function CleanControl({ onCleanComplete }: CleanControlProps) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6">
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-        {/* 时间范围 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">
-              开始日期
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-shadow"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">
-              结束日期
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-shadow"
-            />
-          </div>
-        </div>
+    <>
+      {/* 小按钮 + 状态显示 */}
+      <div className="flex items-center gap-4 mb-4">
+        <button
+          onClick={() => setShowModal(true)}
+          className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-500 transition-colors"
+        >
+          清洗数据
+        </button>
 
-        {/* 股票代码 */}
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-slate-500 mb-1.5">
-            股票代码（可选，多个用逗号分隔）
-          </label>
-          <input
-            type="text"
-            value={stockCodes}
-            onChange={(e) => setStockCodes(e.target.value)}
-            placeholder="如: 600519, 000858"
-            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-shadow"
-          />
-        </div>
-
-        {/* 执行清洗按钮 */}
-        <div className="flex-shrink-0">
-          <button
-            onClick={handleClean}
-            disabled={cleaning}
-            className="w-full lg:w-auto px-6 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-          >
-            {cleaning ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                清洗中...
-              </>
-            ) : (
-              "执行清洗"
-            )}
-          </button>
+        <div className="flex items-center gap-4 text-xs text-slate-500">
+          {statusLoading ? (
+            <span className="text-slate-400">加载中...</span>
+          ) : status ? (
+            <>
+              <span>最后清洗: {formatDateTime(status.last_clean_time)}</span>
+              <span>|</span>
+              <span>{status.total_cycles} 个周期</span>
+              <span>|</span>
+              <span>{status.stocks.length} 只股票</span>
+            </>
+          ) : (
+            <span>暂无缓存</span>
+          )}
         </div>
       </div>
 
       {/* 清洗结果提示 */}
       {cleanResult && (
         <div
-          className={`mt-4 p-3 rounded-lg text-sm ${
+          className={`mb-4 p-3 rounded-lg text-sm ${
             cleanResult.success
               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
               : "bg-red-50 text-red-700 border border-red-200"
           }`}
         >
-          <div className="font-medium">
-            {cleanResult.success ? "清洗成功" : "清洗失败"}
-          </div>
-          <div className="text-xs mt-1 opacity-80">
-            {cleanResult.message}
-            {cleanResult.cleaned_count > 0 && `（共处理 ${cleanResult.cleaned_count} 条记录）`}
-          </div>
+          {cleanResult.message}
+          {cleanResult.cleaned_count > 0 && `（共处理 ${cleanResult.cleaned_count} 条记录）`}
         </div>
       )}
 
-      {/* 清洗状态 */}
-      <div className="mt-4 pt-4 border-t border-slate-100">
-        <h4 className="text-xs font-medium text-slate-500 mb-3">缓存状态</h4>
-        {statusLoading ? (
-          <div className="flex items-center gap-2 text-slate-400 text-sm">
-            <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin" />
-            加载中...
+      {/* 弹窗 */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="text-lg font-medium text-slate-900">清洗数据</h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-slate-600">
+                选择时间范围，只保存时间范围。留空则清洗所有数据。
+              </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                    开始日期
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                    结束日期
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                  股票代码（可选）
+                </label>
+                <input
+                  type="text"
+                  value={stockCodes}
+                  onChange={(e) => setStockCodes(e.target.value)}
+                  placeholder="多个用逗号分隔，如: 600519, 000858"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 p-4 border-t border-slate-200">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleClean}
+                disabled={cleaning}
+                className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors flex items-center gap-2"
+              >
+                {cleaning && (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                )}
+                {cleaning ? "清洗中..." : "开始清洗"}
+              </button>
+            </div>
           </div>
-        ) : status ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-slate-50 rounded-lg p-3">
-              <div className="text-xs text-slate-500">最后清洗时间</div>
-              <div className="text-sm font-medium text-slate-700 mt-1">
-                {formatDateTime(status.last_clean_time)}
-              </div>
-            </div>
-            <div className="bg-slate-50 rounded-lg p-3">
-              <div className="text-xs text-slate-500">缓存周期数量</div>
-              <div className="text-sm font-medium text-slate-700 mt-1">
-                {status.total_cycles}
-              </div>
-            </div>
-            <div className="bg-slate-50 rounded-lg p-3">
-              <div className="text-xs text-slate-500">已缓存股票</div>
-              <div className="text-sm font-medium text-slate-700 mt-1">
-                {status.stocks.length} 只
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-sm text-slate-400">暂无状态信息</div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

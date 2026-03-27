@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   getClearedPositions,
   getClearedPositionDetail,
+  updateClearedPositionNotes,
   ClearedPosition,
   ClearedPositionParams,
   ClearedPositionRecord,
@@ -40,6 +41,9 @@ export default function ClearedPositionsPage() {
   const [detailRecords, setDetailRecords] = useState<ClearedPositionRecord[]>([]);
   const [showDetail, setShowDetail] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState<"records" | "notes">("records");
+  const [notes, setNotes] = useState("");
+  const [notesSaving, setNotesSaving] = useState(false);
 
   const handleDateRangeChange = (range: "this_month" | "three_months" | "custom") => {
     setDateRange(range);
@@ -107,6 +111,8 @@ export default function ClearedPositionsPage() {
   const viewDetail = async (position: ClearedPosition) => {
     setSelectedPosition(position);
     setShowDetail(true);
+    setDetailTab("records");
+    setNotes(position.notes || "");
     setDetailLoading(true);
     try {
       const response = await getClearedPositionDetail(position.stock_code, position.open_date, position.close_date);
@@ -125,6 +131,37 @@ export default function ClearedPositionsPage() {
     setShowDetail(false);
     setSelectedPosition(null);
     setDetailRecords([]);
+    setNotes("");
+  };
+
+  const handleSaveNotes = async () => {
+    if (!selectedPosition) return;
+    setNotesSaving(true);
+    try {
+      const response = await updateClearedPositionNotes(
+        selectedPosition.stock_code,
+        selectedPosition.open_date,
+        selectedPosition.close_date,
+        notes || null
+      );
+      if (response.success) {
+        // Update local state
+        setPositions(prev => prev.map(p =>
+          p.stock_code === selectedPosition.stock_code &&
+          p.open_date === selectedPosition.open_date &&
+          p.close_date === selectedPosition.close_date
+            ? { ...p, notes: notes || null }
+            : p
+        ));
+      } else {
+        alert(response.message || "保存失败");
+      }
+    } catch (error) {
+      console.error("保存笔记失败:", error);
+      alert("保存失败，请重试");
+    } finally {
+      setNotesSaving(false);
+    }
   };
 
   const formatNumber = (num: number | string | null, decimals: number = 2) => {
@@ -448,8 +485,37 @@ export default function ClearedPositionsPage() {
               </div>
             </div>
 
-            {/* 明细表格 */}
+            {/* 标签页切换 */}
+            <div className="px-6 pt-4 border-b border-slate-200">
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setDetailTab("records")}
+                  className={`pb-2 px-1 text-sm font-medium transition-colors border-b-2 ${
+                    detailTab === "records"
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  交易明细
+                </button>
+                <button
+                  onClick={() => setDetailTab("notes")}
+                  className={`pb-2 px-1 text-sm font-medium transition-colors border-b-2 flex items-center gap-1 ${
+                    detailTab === "notes"
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  笔记
+                  {notes && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                </button>
+              </div>
+            </div>
+
+            {/* 明细表格 / 笔记编辑 */}
             <div className="flex-1 overflow-auto p-6">
+              {detailTab === "records" ? (
+                <>
               <h3 className="text-sm font-medium text-slate-600 mb-3">交易明细</h3>
               <div className="border border-slate-200 rounded-xl overflow-hidden">
                 <table className="min-w-full">
@@ -504,6 +570,34 @@ export default function ClearedPositionsPage() {
                   </tbody>
                 </table>
               </div>
+                </>
+              ) : (
+                /* 笔记编辑 */
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-slate-600">交易笔记（Markdown格式）</h3>
+                    <button
+                      onClick={handleSaveNotes}
+                      disabled={notesSaving}
+                      className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 transition-colors flex items-center gap-1"
+                    >
+                      {notesSaving && (
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      )}
+                      保存笔记
+                    </button>
+                  </div>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="记录这笔交易的心路历程、复盘思考..."
+                    className="w-full h-64 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none font-mono"
+                  />
+                  <div className="text-xs text-slate-400">
+                    支持 Markdown 格式，如：**加粗**、*斜体*、`代码`、- 列表等
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

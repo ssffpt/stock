@@ -136,6 +136,7 @@ class ClearedPositionResponse(BaseModel):
     avg_buy_price: Decimal
     avg_sell_price: Decimal
     record_ids: Optional[str] = None
+    notes: Optional[str] = None
     updated_at: datetime
     cost_vs_open: Optional[Decimal] = None
     cost_vs_close: Optional[Decimal] = None
@@ -147,7 +148,20 @@ class ClearedPositionStatus(BaseModel):
     """已清仓周期状态模型"""
     last_clean_time: Optional[datetime] = None
     total_cycles: int
-    stocks: List[str]
+
+
+class UpdateNotesRequest(BaseModel):
+    """更新笔记请求模型"""
+    stock_code: str
+    open_date: date
+    close_date: date
+    notes: Optional[str] = None
+
+
+class UpdateNotesResponse(BaseModel):
+    """更新笔记响应模型"""
+    success: bool
+    message: str
 
 
 # ============== 股票日行情 Schema ==============

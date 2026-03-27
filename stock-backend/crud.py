@@ -805,6 +805,7 @@ def get_cleared_positions_from_table(
             'avg_buy_price': item.avg_buy_price,
             'avg_sell_price': item.avg_sell_price,
             'record_ids': item.record_ids,
+            'notes': item.notes,
             'updated_at': item.updated_at,
         }
         result.append(record)
@@ -837,3 +838,32 @@ def get_cleared_position_status(db: Session) -> Dict[str, Any]:
         'total_cycles': total_cycles,
         'stocks': stocks,
     }
+
+
+def update_cleared_position_notes(
+    db: Session,
+    stock_code: str,
+    open_date: date,
+    close_date: date,
+    notes: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    更新已清仓周期的交易笔记
+    """
+    try:
+        record = db.query(ClearedPosition).filter(
+            ClearedPosition.stock_code == stock_code,
+            ClearedPosition.open_date == open_date,
+            ClearedPosition.close_date == close_date,
+        ).first()
+
+        if not record:
+            return False, f"股票 {stock_code} 在 {open_date} 到 {close_date} 之间的记录不存在"
+
+        record.notes = notes
+        db.commit()
+        return True, "笔记更新成功"
+
+    except Exception as e:
+        db.rollback()
+        return False, f"更新失败: {str(e)}"

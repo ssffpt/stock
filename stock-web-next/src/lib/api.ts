@@ -21,6 +21,9 @@ interface ClearedPosition {
   profit_loss: number;
   profit_rate: number;
   avg_buy_price: number;
+  avg_sell_price?: number;
+  record_ids?: string;
+  notes?: string;
   cost_vs_open: number | null;
   cost_vs_close: number | null;
 }
@@ -111,19 +114,49 @@ interface OriginalDeliveryParams {
 }
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      credentials: 'include',
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.message) {
+          errorMessage += ` - ${errorData.message}`;
+        }
+      } catch {
+        // Response body might be empty or not JSON
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`API 请求超时: ${url}`);
+      }
+      throw error;
+    }
+
+    // Check if it's a network error (Failed to fetch)
+    throw new Error(`网络请求失败: ${url}`);
   }
-
-  return response.json();
 }
 
 // ============== 已清仓股票统计 API ==============
@@ -161,6 +194,24 @@ export async function getClearedPositionDetail(
 ): Promise<ApiResponse<{ summary: ClearedPosition; records: ClearedPositionRecord[] }>> {
   const url = `${API_BASE_URL}/cleared-positions/detail?stock_code=${stockCode}&open_date=${openDate}&close_date=${closeDate}`;
   return fetchApi(url);
+}
+
+export async function updateClearedPositionNotes(
+  stockCode: string,
+  openDate: string,
+  closeDate: string,
+  notes: string | null
+): Promise<{ success: boolean; message: string }> {
+  const url = `${API_BASE_URL}/cleared-positions/notes`;
+  return fetchApi(url, {
+    method: 'POST',
+    body: JSON.stringify({
+      stock_code: stockCode,
+      open_date: openDate,
+      close_date: closeDate,
+      notes: notes,
+    }),
+  });
 }
 
 // ============== 原始交割单 API ==============

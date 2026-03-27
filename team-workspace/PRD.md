@@ -51,6 +51,16 @@
 - 显示最近 10 条清洗记录
 - 日志字段：清洗时间、日期范围、清洗股票数、周期数、操作状态
 
+### 3.6 周期笔记功能
+- 支持为每个清仓周期添加Markdown格式的笔记
+- 笔记内容存储在cleared_position表的notes字段
+- 支持编辑和保存操作
+- 笔记内容可包含：
+  - 交易复盘总结
+  - 盈亏原因分析
+  - 操作反思记录
+  - 其他需要备注的信息
+
 ---
 
 ## 4. 新表结构 cleared_position
@@ -77,6 +87,7 @@
 | avg_buy_price | DECIMAL(10,3) | 买入均价 |
 | avg_sell_price | DECIMAL(10,3) | 卖出均价 |
 | record_ids | TEXT | 对应原始交割单ID列表，JSON格式 |
+| notes | TEXT | Markdown格式的周期笔记 |
 | updated_at | DATETIME | 最后更新时间 |
 
 ### 索引设计

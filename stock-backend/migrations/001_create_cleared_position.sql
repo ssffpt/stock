@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS cleared_position (
     avg_buy_price DECIMAL(10, 3) NOT NULL COMMENT '买入均价',
     avg_sell_price DECIMAL(10, 3) NOT NULL COMMENT '卖出均价',
     record_ids TEXT COMMENT '对应的原始交割单ID列表JSON数组',
+    notes TEXT COMMENT '交易笔记，Markdown格式',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后清洗时间',
 
     UNIQUE KEY uk_stock_cycle (stock_code, cycle_index),

@@ -69,4 +69,5 @@ class ClearedPosition(Base):
     avg_buy_price = Column(DECIMAL(10, 3), nullable=False, comment="买入均价")
     avg_sell_price = Column(DECIMAL(10, 3), nullable=False, comment="卖出均价")
     record_ids = Column(Text, nullable=True, comment="对应的原始交割单ID列表JSON数组")
+    notes = Column(Text, nullable=True, comment="交易笔记，Markdown格式")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="最后清洗时间")

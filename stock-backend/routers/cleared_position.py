@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 import crud
-from schemas import CleanRequest, CleanResponse, ClearedPositionStatus
+from schemas import CleanRequest, CleanResponse, ClearedPositionStatus, UpdateNotesRequest, UpdateNotesResponse
 
 router = APIRouter(prefix="/cleared-positions", tags=["已清仓股票统计"])
 
@@ -117,3 +117,19 @@ def get_cleared_position_status(
     """获取已清仓周期预计算表状态"""
     status = crud.get_cleared_position_status(db=db)
     return ClearedPositionStatus(**status)
+
+
+@router.post("/notes", response_model=UpdateNotesResponse)
+def update_cleared_position_notes(
+    request: UpdateNotesRequest,
+    db: Session = Depends(get_db),
+):
+    """更新已清仓周期的交易笔记"""
+    success, message = crud.update_cleared_position_notes(
+        db=db,
+        stock_code=request.stock_code,
+        open_date=request.open_date,
+        close_date=request.close_date,
+        notes=request.notes,
+    )
+    return UpdateNotesResponse(success=success, message=message)
