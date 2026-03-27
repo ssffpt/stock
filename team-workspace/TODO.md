@@ -45,6 +45,9 @@
 - `GET /cleared-positions` - 已修改为从预计算表查询并返回last_clean_time
 
 ## 最新动态
+- 2026-03-27: 修复 cleared_position 表 notes 字段缺失问题
+  - schema.sql 缺少 notes 列定义
+  - 已执行 ALTER TABLE 添加 notes 字段
 - 2026-03-27: 功能迭代完成
   1. 清洗UI优化：小按钮+弹窗交互
   2. cycle_index评估结论：保留原设计不变
@@ -56,10 +59,10 @@
   4. 前端默认日期未实现"本月"选中
 
 ## 待修复问题清单
-- [x] 修复 cycle_index 递增逻辑（crud.py clean_cleared_positions）
-- [x] 添加 avg_sell_price 计算（crud.py calculate_cycle_stats）
-- [x] 统一字段定义与PRD一致（models.py）
-- [x] 修复前端默认日期为"本月"（CleanControl.tsx）
+- ✅ 修复 cycle_index 递增逻辑（crud.py clean_cleared_positions）
+- ✅ 添加 avg_sell_price 计算（crud.py calculate_cycle_stats）
+- ✅ 统一字段定义与PRD一致（models.py）
+- ✅ 修复前端默认日期为"本月"（CleanControl.tsx）
 
 ## 笔记功能
 - 前端组件：支持Markdown编辑和预览

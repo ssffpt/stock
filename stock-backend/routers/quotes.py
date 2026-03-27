@@ -173,39 +173,3 @@ def sync_quotes(
             "synced_count": total_synced,
         }
     }
-
-
-@router.get("/{stock_code}")
-def get_stock_quote(
-    stock_code: str,
-    start_date: Optional[date] = Query(None, description="开始日期"),
-    end_date: Optional[date] = Query(None, description="结束日期"),
-    db: Session = Depends(get_db),
-):
-    """获取单只股票的行情数据"""
-    query = db.query(StockDailyQuote).filter(StockDailyQuote.stock_code == stock_code)
-
-    if start_date:
-        query = query.filter(StockDailyQuote.trade_date >= start_date)
-    if end_date:
-        query = query.filter(StockDailyQuote.trade_date <= end_date)
-
-    quotes = query.order_by(StockDailyQuote.trade_date).all()
-
-    return {
-        "code": 200,
-        "data": {
-            "stock_code": stock_code,
-            "quotes": [
-                {
-                    "trade_date": q.trade_date,
-                    "open_price": q.open_price,
-                    "close_price": q.close_price,
-                    "high_price": q.high_price,
-                    "low_price": q.low_price,
-                    "volume": q.volume,
-                }
-                for q in quotes
-            ]
-        }
-    }
